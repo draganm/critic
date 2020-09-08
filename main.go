@@ -122,6 +122,8 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 				statusCodeGauge.Set(0.0)
 				probeFailedCounter.Add(1)
 				targetIsHealthyGauge.Set(0)
+				duration := time.Since(startTime)
+				requestDuration.Set(duration.Seconds())
 				continue
 			}
 
@@ -131,6 +133,8 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 				statusCodeGauge.Set(1.0)
 				probeFailedCounter.Add(1)
 				targetIsHealthyGauge.Set(0)
+				duration := time.Since(startTime)
+				requestDuration.Set(duration.Seconds())
 				continue
 			}
 
@@ -147,8 +151,8 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 			serverCertificateExpirationTime.Set(certExpiryTime)
 
 			duration := time.Since(startTime)
-
 			requestDuration.Set(duration.Seconds())
+
 			statusCodeGauge.Set(float64(res.StatusCode))
 
 			failed := res.StatusCode < 100 || res.StatusCode >= 500 || res.StatusCode == 404

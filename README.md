@@ -17,7 +17,7 @@ Request duration of the last probe in seconds.
 
 ### critic_target_server_certificate_expiration_time
 Unix time of the TLS Certificate expiration.
-If the protocol is not `https`, this value will be `0`
+This metric will be exported only for server URLs with `https` scheme.
 
 ### critic_target_status_code
 HTTP Status code of the last probe.

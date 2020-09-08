@@ -64,18 +64,24 @@ func main() {
 }
 
 func watchURL(name, target string, logger *zap.SugaredLogger) error {
-	_, err := url.Parse(target)
+	u, err := url.Parse(target)
 	if err != nil {
 		return errors.Wrapf(err, "while parsing URL %q", target)
 	}
 
-	serverCertificateExpirationTime := promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "critic_target_server_certificate_expiration_time",
-		ConstLabels: prometheus.Labels{
-			"name": name,
-			"url":  target,
-		},
-	})
+	isHTTPS := u.Scheme == "https"
+
+	var serverCertificateExpirationTime prometheus.Gauge
+
+	if isHTTPS {
+		serverCertificateExpirationTime = promauto.NewGauge(prometheus.GaugeOpts{
+			Name: "critic_target_server_certificate_expiration_time",
+			ConstLabels: prometheus.Labels{
+				"name": name,
+				"url":  target,
+			},
+		})
+	}
 
 	requestDuration := promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "critic_target_request_duration",
@@ -140,15 +146,17 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 
 			var certExpiryTime = 0.0
 
-			if res.TLS != nil {
-				certs := res.TLS.PeerCertificates
-				if len(certs) > 0 {
-					cert := certs[0]
-					certExpiryTime = float64(cert.NotAfter.Unix())
+			if isHTTPS {
+				if res.TLS != nil {
+					certs := res.TLS.PeerCertificates
+					if len(certs) > 0 {
+						cert := certs[0]
+						certExpiryTime = float64(cert.NotAfter.Unix())
+					}
 				}
-			}
 
-			serverCertificateExpirationTime.Set(certExpiryTime)
+				serverCertificateExpirationTime.Set(certExpiryTime)
+			}
 
 			duration := time.Since(startTime)
 			requestDuration.Set(duration.Seconds())

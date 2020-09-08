@@ -68,6 +68,15 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 	if err != nil {
 		return errors.Wrapf(err, "while parsing URL %q", target)
 	}
+
+	requestDuration := promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "critic_target_request_duration",
+		ConstLabels: prometheus.Labels{
+			"name": name,
+			"url":  target,
+		},
+	})
+
 	statusCodeGauge := promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "critic_target_status_code",
 		ConstLabels: prometheus.Labels{
@@ -76,24 +85,59 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 		},
 	})
 
+	probeFailedCounter := promauto.NewCounter(prometheus.CounterOpts{
+		Name: "critic_target_probe_failed_counter",
+		ConstLabels: prometheus.Labels{
+			"name": name,
+			"url":  target,
+		},
+	})
+
+	targetIsHealthyGauge := promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "critic_target_is_healthy",
+		ConstLabels: prometheus.Labels{
+			"name": name,
+			"url":  target,
+		},
+	})
+
 	logger.Infof("watching %s: %s", name, target)
 	go func() {
+
 		for ; ; time.Sleep(30 * time.Second) {
+
+			startTime := time.Now()
 
 			req, err := http.NewRequest("GET", target, nil)
 			if err != nil {
 				logger.With("error", err).Error("while creating http request")
 				statusCodeGauge.Set(0.0)
+				probeFailedCounter.Add(1)
+				targetIsHealthyGauge.Set(0)
 				continue
 			}
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
 				logger.With("error", err).Error("while performing http request")
 				statusCodeGauge.Set(1.0)
+				probeFailedCounter.Add(1)
+				targetIsHealthyGauge.Set(0)
 				continue
 			}
 
+			duration := time.Since(startTime)
+
+			requestDuration.Set(duration.Seconds())
 			statusCodeGauge.Set(float64(res.StatusCode))
+
+			failed := res.StatusCode < 100 || res.StatusCode >= 500 || res.StatusCode == 404
+
+			if failed {
+				probeFailedCounter.Add(1)
+				targetIsHealthyGauge.Set(0)
+			} else {
+				targetIsHealthyGauge.Set(1)
+			}
 
 			res.Body.Close()
 

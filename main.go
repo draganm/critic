@@ -95,18 +95,10 @@ func watchURL(name, target string, logger *zap.SugaredLogger) error {
 
 			statusCodeGauge.Set(float64(res.StatusCode))
 
-			defer res.Body.Close()
+			res.Body.Close()
 
 		}
 
 	}()
 	return nil
 }
-
-var x = promauto.NewGauge(prometheus.GaugeOpts{
-	// Namespace: "critic",
-	// Subsystem: "Namespace",
-	Name: "x",
-
-	// ConstLabels:
-})

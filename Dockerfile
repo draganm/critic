@@ -6,7 +6,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build  -o critic .
 
-FROM alpine:3.12.0
+FROM alpine:3.14.3
 RUN apk --update add ca-certificates
 COPY --from=build /critic/critic /critic
 ENTRYPOINT ["/critic"]
